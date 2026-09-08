@@ -1,0 +1,7 @@
+.auth-page header,.auth-page main,.auth-page footer{max-width:620px}
+.auth-page main{padding-top:64px;padding-bottom:64px;min-height:360px}
+.auth-page h1{font-size:clamp(32px,7vw,44px);margin-bottom:20px}
+.app-button{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:8px 28px;border-radius:14px;background:#305b6f;color:#fff;font-weight:600;text-decoration:none;margin:10px 0 24px}
+.app-button[hidden]{display:none}
+.auth-help{font-size:15px;color:#506572;max-width:440px}
+@media(max-width:480px){.auth-page main{padding-top:40px}.app-button{display:flex}}
