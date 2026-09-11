@@ -1,0 +1,43 @@
+name: pr-checks
+
+# Self-hosted runners: no billable Actions minutes. The Windows box handles
+# everything except Xcode, which Apple's toolchain pins to macOS.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '24'}
+      - run: node auth.test.cjs
+
+  secrets-scan:
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0, persist-credentials: false}
+      - name: No credential values in the diff
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          [ -z "$BASE" ] && exit 0
+          if git diff "$BASE" "$HEAD" -- . ':(exclude).github/workflows/*' \
+             | grep '^+' \
+             | grep -nE 'eyJ[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{10,}|BEGIN [A-Z ]*PRIVATE KEY|sbp_[a-f0-9]{40}|gh[pousr]_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16}'; then
+            echo "::error::a credential VALUE appears in this diff"; exit 1
+          fi
+          echo "clean"
