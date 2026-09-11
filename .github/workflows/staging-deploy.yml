@@ -1,0 +1,44 @@
+name: staging-deploy
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: false
+
+jobs:
+  # No backend for this app, so nothing to deploy. The release PR job below
+  # still runs so the promotion path is identical to every other app.
+  noop:
+    runs-on: [self-hosted, linux]
+    steps:
+      - run: echo "no backend configured — nothing to deploy"
+
+  release-pr:
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          AHEAD=$(git rev-list --count origin/main..origin/staging)
+          [ "$AHEAD" -eq 0 ] && { echo "staging not ahead of main"; exit 0; }
+          BODY=$(
+            echo "Everything on \`staging\` not yet in \`main\`. Merging this releases to production."
+            echo; echo "## Commits ($AHEAD)"
+            git log --no-merges --format='- %s (%h)' origin/main..origin/staging
+            echo; echo "_Refreshed automatically on every push to staging._"
+          )
+          N=$(gh pr list --base main --head staging --state open --json number -q '.[0].number' || true)
+          if [ -n "$N" ]; then gh pr edit "$N" --body "$BODY" >/dev/null; echo "refreshed #$N"
+          else gh pr create --base main --head staging --title "Release: staging -> main" --body "$BODY" >/dev/null; echo "opened"; fi
